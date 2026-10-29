@@ -156,7 +156,6 @@ if((window as any).FlutterwaveCheckout){
 <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Enter your email (e.g. you@gmail.com)" style={{width:'100%',marginTop:14,padding:14,borderRadius:12,border:'2px solid #000',fontSize:14,fontWeight:700,boxSizing:'border-box'}}/>
 <button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16}}>{loading?'Processing...':'Pay ₦1,000 & Join Telegram →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b><br/><a href={TELEGRAM_PRIVATE_LINK} style={{color:'#000',fontWeight:900,fontSize:14,textDecoration:'underline'}}>Go to Private Telegram Group</a></div>}
-<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Flutterwave • Card payment only — company name hidden ✅</div>
 </div>
 </div>
 </div>
