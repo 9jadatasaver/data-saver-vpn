@@ -1,10 +1,16 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-const supabase = createClient('https://gqifluvkrjzsebfdjcio.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWZsdXZrcmp6c2ViZmRqY2lvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjYxNzcsImV4cCI6MjA3NzMwMjE3N30.zonQMk22nXN0VsbHyI88hT27ntl-VxEEi8k2G8-k5lc')
+
+const supabase = createClient(
+'https://gqifluvkrjzsebfdjcio.supabase.co',
+'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWZsdXZrcmp6c2ViZmRqY2lvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjYxNzcsImV4cCI6MjA3NzMwMjE3N30.zonQMk22nXN0VsbHyI88hT27ntl-VxEEi8k2G8-k5lc'
+)
+
 const TELEGRAM_PRIVATE_LINK="https://t.me/+_k7kyiFHkco4MWI0"
 const PAYSTACK_PUBLIC_KEY="pk_live_cd1a703e3c95096d29fc46c1ef662f2b4740dfec"
 const PAYSTACK_SUBACCOUNT="ACCT_4e96wt0mrlrf5zx"
+
 export default function DataSaverPage(){
 const [email,setEmail]=useState('')
 const [loading,setLoading]=useState(false)
@@ -13,131 +19,160 @@ const [stats,setStats]=useState({ total:0, today:0 })
 const [countries,setCountries]=useState<any[]>([])
 const [allSubs,setAllSubs]=useState<any[]>([])
 const [paid,setPaid]=useState(false)
+const [adminLoading,setAdminLoading]=useState(false)
+
 useEffect(()=>{
 try{
-const params=new URLSearchParams(window.location.search)
-if(params.get('admin')==='data2026'){ localStorage.setItem('data_admin','true'); setIsAdmin(true) }
-else if(localStorage.getItem('data_admin')==='true'){ setIsAdmin(true) }
-if(localStorage.getItem('data_paid')==='true') setPaid(true)
-const script=document.createElement('script')
-script.src='https://js.paystack.co/v1/inline.js'
-script.async=true
-document.body.appendChild(script)
+  if(typeof window==='undefined') return
+  const params=new URLSearchParams(window.location.search)
+  if(params.get('admin')==='data2026'){ 
+    localStorage.setItem('data_admin','true'); 
+    setIsAdmin(true) 
+  } else if(localStorage.getItem('data_admin')==='true'){ 
+    setIsAdmin(true) 
+  }
+  if(localStorage.getItem('data_paid')==='true') setPaid(true)
+  const script=document.createElement('script')
+  script.src='https://js.paystack.co/v1/inline.js'
+  script.async=true
+  document.body.appendChild(script)
 }catch{}
 fetchStats()
 },[])
+
 const getGeoLocation=async()=>{
 try{
-const cachedStr=localStorage.getItem('data_geo_cache')
-if(cachedStr){
-  try{
-    const cached=JSON.parse(cachedStr)
-    if(Date.now()-cached.ts<24*60*60*1000) return cached.data
-  }catch{}
-}
-const r=await fetch('https://ipapi.co/json/')
-const d=await r.json()
-const data={ country: d.country_name||null, city: d.city||null, code: d.country_code||null }
-localStorage.setItem('data_geo_cache', JSON.stringify({ ts: Date.now(), data }))
-return data
+  const cachedStr=localStorage.getItem('data_geo_cache')
+  if(cachedStr){
+    try{
+      const cached=JSON.parse(cachedStr)
+      if(Date.now()-cached.ts<24*60*60*1000) return cached.data
+    }catch{}
+  }
+  const r=await fetch('https://ipapi.co/json/')
+  const d=await r.json()
+  const data={ country: d.country_name||null, city: d.city||null, code: d.country_code||null }
+  localStorage.setItem('data_geo_cache', JSON.stringify({ ts: Date.now(), data }))
+  return data
 }catch{ return { country: null, city: null, code: null } }
 }
+
 const getDeviceId=()=>{
 try{
-let id=localStorage.getItem('data_device_id')
-if(id) return id
-id='data_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
-localStorage.setItem('data_device_id', id)
-return id
+  let id=localStorage.getItem('data_device_id')
+  if(id) return id
+  id='data_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
+  localStorage.setItem('data_device_id', id)
+  return id
 }catch{ return 'data_'+Date.now() }
 }
+
 const fetchStats=async()=>{
+setAdminLoading(true)
 try{
-const todayStart=new Date()
-todayStart.setHours(0,0,0,0)
-const { count: total }=await supabase.from('data_subscribers').select('*',{count:'exact',head:true})
-const { count: today }=await supabase.from('data_subscribers').select('*',{count:'exact',head:true}).gte('created_at', todayStart.toISOString())
-setStats({ total: total||0, today: today||0 })
-const { data: rows }=await supabase.from('data_subscribers').select('country,country_code')
-const { data: all }=await supabase.from('data_subscribers').select('*').order('created_at',{ascending:false}).limit(100)
-if(all) setAllSubs(all)
-if(rows){
-  const map:any={}
-  rows.forEach((r:any)=>{
-    const key=(r.country_code||'')+'|'+(r.country||'Unknown')
-    if(!map[key]) map[key]={ name: r.country||'Unknown', code: r.country_code||'', count:0 }
-    map[key].count+=1
-  })
-  setCountries(Object.values(map))
+  const todayStart=new Date()
+  todayStart.setHours(0,0,0,0)
+  const { count: total }=await supabase.from('data_subscribers').select('*',{count:'exact',head:true})
+  const { count: today }=await supabase.from('data_subscribers').select('*',{count:'exact',head:true}).gte('created_at', todayStart.toISOString())
+  setStats({ total: total||0, today: today||0 })
+  const { data: rows }=await supabase.from('data_subscribers').select('country,country_code')
+  const { data: all }=await supabase.from('data_subscribers').select('*').order('created_at',{ascending:false}).limit(100)
+  if(all) setAllSubs(all)
+  if(rows){
+    const map:any={}
+    rows.forEach((r:any)=>{
+      const key=(r.country_code||'')+'|'+(r.country||'Unknown')
+      if(!map[key]) map[key]={ name: r.country||'Unknown', code: r.country_code||'', count:0 }
+      map[key].count+=1
+    })
+    setCountries(Object.values(map))
+  }
+}catch(e){ console.log('stats error', e) }
+setAdminLoading(false)
 }
-}catch{}
-}
+
 const handlePay=async()=>{
 if(!email || !email.includes('@')){ alert('Enter valid email'); return }
 setLoading(true)
 try{
-const geo=await getGeoLocation()
-const deviceId=getDeviceId()
-const PaystackPop=(window as any).PaystackPop
-if(!PaystackPop){ alert('Paystack loading... try again'); setLoading(false); return }
-const handler=PaystackPop.setup({
-  key: PAYSTACK_PUBLIC_KEY,
-  email: email,
-  amount: 100000,
-  currency: 'NGN',
-  ref: 'DATA_'+Date.now()+'_'+deviceId,
-  subaccount: PAYSTACK_SUBACCOUNT,
-  channels: ['card'],
-  callback: function(response:any){
-    (async ()=>{
-      try{
-        await supabase.from('data_subscribers').insert({ email: email, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
-        localStorage.setItem('data_paid','true')
-        setPaid(true)
-        alert('Payment Successful! Redirecting to Telegram...')
-        window.location.href=TELEGRAM_PRIVATE_LINK
-      }catch(e:any){ window.location.href=TELEGRAM_PRIVATE_LINK }
-      setLoading(false)
-    })()
-  },
-  onClose: function(){ setLoading(false) }
-})
-handler.openIframe()
+  const geo=await getGeoLocation()
+  const deviceId=getDeviceId()
+  const PaystackPop=(window as any).PaystackPop
+  if(!PaystackPop){ alert('Paystack still loading... wait 3 sec and try again'); setLoading(false); return }
+  const handler=PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email: email,
+    amount: 100000,
+    currency: 'NGN',
+    ref: 'DATA_'+Date.now()+'_'+deviceId,
+    subaccount: PAYSTACK_SUBACCOUNT,
+    channels: ['card'],
+    callback: function(response:any){
+      (async ()=>{
+        try{
+          await supabase.from('data_subscribers').insert({ email: email, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
+          localStorage.setItem('data_paid','true')
+          setPaid(true)
+          alert('Payment Successful! Redirecting to Telegram...')
+          window.location.href=TELEGRAM_PRIVATE_LINK
+        }catch(e:any){ window.location.href=TELEGRAM_PRIVATE_LINK }
+        setLoading(false)
+      })()
+    },
+    onClose: function(){ setLoading(false) }
+  })
+  handler.openIframe()
 }catch(e:any){ alert('Error: '+e.message); setLoading(false) }
 }
+
 return(
 <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff',fontFamily:'system-ui'}}>
+
 {isAdmin&&(
-<div style={{margin:16,background:'#111',border:'2px solid #00ff00',borderRadius:16,padding:16}}>
-<b style={{color:'#00ff00',fontSize:16}}>💰 ADMIN DASHBOARD — ACTIVE PAYMENTS</b>
+<div style={{margin:16,background:'#111',border:'2px solid #00ff00',borderRadius:16,padding:16,position:'relative',zIndex:99}}>
+<div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+<b style={{color:'#00ff00',fontSize:16}}>💰 ADMIN DASHBOARD — ACTIVE PAYMENTS {adminLoading?' (loading...)':''}</b>
+<button onClick={fetchStats} style={{background:'#00ff00',color:'#000',border:'none',padding:'6px 12px',borderRadius:8,fontSize:11,fontWeight:900}}>↻ REFRESH</button>
+</div>
+
 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:12}}>
 <div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>TODAY</div><div style={{fontSize:24,fontWeight:900,color:'#00ff00'}}>{stats.today}</div></div>
 <div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>TOTAL PAID</div><div style={{fontSize:24,fontWeight:900,color:'#fff'}}>{stats.total}</div><div style={{fontSize:10,color:'#00ff00'}}>₦{stats.total*1000} made</div></div>
 <div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>BALANCE</div><div style={{fontSize:18,fontWeight:900,color:'#00ff00'}}>₦{(stats.total*1000).toLocaleString()}</div><div style={{fontSize:9,opacity:.5}}>in Paystack</div></div>
 </div>
+
 <div style={{marginTop:12,background:'#000',borderRadius:12,padding:12,border:'1px solid #333'}}>
 <b style={{color:'#00ff00',fontSize:11}}>🌍 BY COUNTRY</b>
-{countries.length===0?<div style={{fontSize:11,opacity:.6,marginTop:6}}>No paid yet</div>:countries.map((c:any)=><div key={c.code+'_'+c.name} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #222',fontSize:12}}><span>{c.code} {c.name}</span><span style={{fontWeight:900,background:'#00ff00',color:'#000',padding:'2px 8px',borderRadius:10}}>{c.count}</span></div>)}
+{countries.length===0?<div style={{fontSize:11,opacity:.6,marginTop:6}}>No paid yet — table empty</div>:countries.map((c:any)=><div key={c.code+'_'+c.name} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #222',fontSize:12}}><span>{c.code} {c.name}</span><span style={{fontWeight:900,background:'#00ff00',color:'#000',padding:'2px 8px',borderRadius:10}}>{c.count}</span></div>)}
 </div>
+
 <div style={{marginTop:12,background:'#000',borderRadius:12,padding:12,border:'1px solid #333'}}>
-<div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:6}}>
 <b style={{color:'#00ff00',fontSize:11}}>📧 ALL ACTIVE PAYMENTS (Last 100)</b>
+<div style={{display:'flex',gap:6}}>
 <button onClick={()=>{const emails=allSubs.map(s=>s.email).join(', '); navigator.clipboard.writeText(emails); alert('Copied '+allSubs.length+' emails!')}} style={{background:'#00ff00',color:'#000',border:'none',padding:'4px 10px',borderRadius:8,fontSize:10,fontWeight:900}}>COPY EMAILS</button>
+<button onClick={()=>{const csv='email,country,city,date\n'+allSubs.map(s=>`${s.email},${s.country||''},${s.city||''},${new Date(s.created_at).toLocaleString()}`).join('\n'); const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='subscribers.csv'; a.click();}} style={{background:'#fff',color:'#000',border:'none',padding:'4px 10px',borderRadius:8,fontSize:10,fontWeight:900}}>EXPORT CSV</button>
 </div>
-<div style={{marginTop:8,maxHeight:300,overflow:'auto'}}>
-{allSubs.length===0?<div style={{fontSize:11,opacity:.6}}>No payments yet</div>:
+</div>
+<div style={{marginTop:8,maxHeight:350,overflow:'auto'}}>
+{allSubs.length===0?<div style={{fontSize:11,opacity:.6}}>No payments yet — check Supabase table data_subscribers</div>:
 <table style={{width:'100%',fontSize:11,borderCollapse:'collapse'}}>
-<thead><tr style={{textAlign:'left',opacity:.6,borderBottom:'1px solid #333'}}><th style={{padding:'4px'}}>Email</th><th>Location</th><th>Date</th></tr></thead>
+<thead><tr style={{textAlign:'left',opacity:.6,borderBottom:'1px solid #333',position:'sticky',top:0,background:'#000'}}><th style={{padding:'4px'}}>Email</th><th>Location</th><th>Date</th></tr></thead>
 <tbody>
-{allSubs.map((s:any)=><tr key={s.id} style={{borderBottom:'1px solid #222'}}><td style={{padding:'6px 4px',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis'}}>{s.email}</td><td style={{fontSize:10}}>{s.city||''} {s.country_code||''}</td><td style={{fontSize:9,opacity:.7}}>{new Date(s.created_at).toLocaleDateString()} {new Date(s.created_at).toLocaleTimeString()}</td></tr>)}
+{allSubs.map((s:any)=><tr key={s.id} style={{borderBottom:'1px solid #222'}}><td style={{padding:'6px 4px',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.email}</td><td style={{fontSize:10}}>{s.city||''} {s.country_code||''}</td><td style={{fontSize:9,opacity:.7}}>{new Date(s.created_at).toLocaleDateString()} {new Date(s.created_at).toLocaleTimeString()}</td></tr>)}
 </tbody>
 </table>
 }
 </div>
 </div>
-<button onClick={()=>{localStorage.removeItem('data_admin'); setIsAdmin(false)}} style={{marginTop:10,background:'#222',color:'#fff',border:'1px solid #333',padding:'6px 12px',borderRadius:8,fontSize:10}}>Logout Admin</button>
+
+<div style={{display:'flex',gap:8,marginTop:10}}>
+<button onClick={()=>{localStorage.removeItem('data_admin'); setIsAdmin(false); alert('Admin logged out')}} style={{background:'#222',color:'#fff',border:'1px solid #333',padding:'6px 12px',borderRadius:8,fontSize:10}}>Logout Admin</button>
+<button onClick={()=>{localStorage.removeItem('data_admin'); setIsAdmin(false); window.location.href=window.location.pathname}} style={{background:'#333',color:'#fff',border:'1px solid #444',padding:'6px 12px',borderRadius:8,fontSize:10}}>Hide Dashboard</button>
+</div>
 </div>
 )}
+
 <div style={{maxWidth:480,margin:'0 auto',padding:20}}>
 <div style={{textAlign:'center',marginTop:20}}>
 <div style={{width:80,height:80,background:'#00ff00',borderRadius:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,margin:'0 auto'}}>📶</div>
@@ -153,9 +188,9 @@ return(
 <h2 style={{fontWeight:900,fontSize:18}}>Subscribe Now — ₦1,000 Only</h2>
 <p style={{fontSize:12,opacity:.6,marginTop:4}}>Enter email, pay with card, get instant Telegram access</p>
 <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Enter your email (e.g. you@gmail.com)" style={{width:'100%',marginTop:14,padding:14,borderRadius:12,border:'2px solid #000',fontSize:14,fontWeight:700,boxSizing:'border-box'}}/>
-<button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16}}>{loading?'Processing...':'Pay ₦1,000 & Join Telegram →'}</button>
+<button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16,cursor:'pointer'}}>{loading?'Processing...':'Pay ₦1,000 & Join Telegram →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b><br/><a href={TELEGRAM_PRIVATE_LINK} style={{color:'#000',fontWeight:900,fontSize:14,textDecoration:'underline'}}>Go to Private Telegram Group</a></div>}
-<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack</div>
+<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack • Card only</div>
 </div>
 </div>
 </div>
