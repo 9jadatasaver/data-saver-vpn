@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 const supabase = createClient('https://gqifluvkrjzsebfdjcio.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWZsdXZrcmp6c2ViZmRqY2lvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjYxNzcsImV4cCI6MjA3NzMwMjE3N30.zonQMk22nXN0VsbHyI88hT27ntl-VxEEi8k2G8-k5lc')
 const TELEGRAM_PRIVATE_LINK="https://t.me/+_k7kyiFHkco4MWI0"
-const FLW_PUBLIC_KEY="FLWPUBK-05a9d781a73afe272f7374d272a775c4-X"
+const PAYSTACK_PUBLIC_KEY="pk_live_cd1a703e3c95096d29fc46c1ef662f2b4740dfec"
+const PAYSTACK_SUBACCOUNT="ACCT_4e96wt0mrlrf5zx"
 export default function DataSaverPage(){
 const [email,setEmail]=useState('')
 const [loading,setLoading]=useState(false)
@@ -19,7 +20,7 @@ if(params.get('admin')==='data2026'){ localStorage.setItem('data_admin','true');
 else if(localStorage.getItem('data_admin')==='true'){ setIsAdmin(true) }
 if(localStorage.getItem('data_paid')==='true') setPaid(true)
 const script=document.createElement('script')
-script.src='https://checkout.flutterwave.com/v3.js'
+script.src='https://js.paystack.co/v1/inline.js'
 script.async=true
 document.body.appendChild(script)
 }catch{}
@@ -77,36 +78,37 @@ setLoading(true)
 try{
 const geo=await getGeoLocation()
 const deviceId=getDeviceId()
-if((window as any).FlutterwaveCheckout){
-  (window as any).FlutterwaveCheckout({
-    public_key: FLW_PUBLIC_KEY,
-    tx_ref: 'DATA_'+Date.now()+'_'+deviceId,
-    amount: 1000,
+if((window as any).PaystackPop){
+  const handler=(window as any).PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email: email,
+    amount: 1000*100,
     currency: 'NGN',
-    payment_options: 'card',
-    customer: { email: email, name: email.split('@')[0] },
-    customizations: { title: 'Data Saver VPN', description: '₦1000 Lifetime Access', logo: 'https://cdn-icons-png.flaticon.com/512/1087/1087815.png' },
+    ref: 'DATA_'+Date.now()+'_'+deviceId,
+    subaccount: PAYSTACK_SUBACCOUNT,
+    bearer: 'subaccount',
+    channels: ['card'],
+    label: 'Data Saver VPN - Lifetime Access',
+    onClose: function(){ setLoading(false) },
     callback: async function(response:any){
-      if(response.status==='successful'){
-        try{
-          await supabase.from('data_subscribers').insert({ email: email, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid' })
-          localStorage.setItem('data_paid','true')
-          setPaid(true)
-          alert('Payment Successful! Redirecting to Telegram...')
-          window.location.href=TELEGRAM_PRIVATE_LINK
-        }catch(e:any){ window.location.href=TELEGRAM_PRIVATE_LINK }
-      }
+      try{
+        await supabase.from('data_subscribers').insert({ email: email, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
+        localStorage.setItem('data_paid','true')
+        setPaid(true)
+        alert('Payment Successful! Redirecting to Telegram...')
+        window.location.href=TELEGRAM_PRIVATE_LINK
+      }catch(e:any){ window.location.href=TELEGRAM_PRIVATE_LINK }
       setLoading(false)
-    },
-    onclose: function(){ setLoading(false) }
+    }
   })
+  handler.openIframe()
 } else {
-  alert('Flutterwave loading... try again in 3 seconds')
+  alert('Paystack loading... try again in 3 seconds')
   setLoading(false)
 }
 }catch(e:any){ alert('Error: '+e.message); setLoading(false) }
 }
-  return(
+return(
 <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff',fontFamily:'system-ui'}}>
 {isAdmin&&(
 <div style={{margin:16,background:'#111',border:'2px solid #00ff00',borderRadius:16,padding:16}}>
@@ -114,7 +116,7 @@ if((window as any).FlutterwaveCheckout){
 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:12}}>
 <div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>TODAY</div><div style={{fontSize:24,fontWeight:900,color:'#00ff00'}}>{stats.today}</div></div>
 <div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>TOTAL PAID</div><div style={{fontSize:24,fontWeight:900,color:'#fff'}}>{stats.total}</div><div style={{fontSize:10,color:'#00ff00'}}>₦{stats.total*1000} made</div></div>
-<div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>BALANCE</div><div style={{fontSize:18,fontWeight:900,color:'#00ff00'}}>₦{(stats.total*1000).toLocaleString()}</div><div style={{fontSize:9,opacity:.5}}>in Flutterwave</div></div>
+<div style={{background:'#000',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #333'}}><div style={{fontSize:11,opacity:.7}}>BALANCE</div><div style={{fontSize:18,fontWeight:900,color:'#00ff00'}}>₦{(stats.total*1000).toLocaleString()}</div><div style={{fontSize:9,opacity:.5}}>in Paystack</div></div>
 </div>
 <div style={{marginTop:12,background:'#000',borderRadius:12,padding:12,border:'1px solid #333'}}>
 <b style={{color:'#00ff00',fontSize:11}}>🌍 BY COUNTRY</b>
@@ -156,7 +158,7 @@ if((window as any).FlutterwaveCheckout){
 <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Enter your email (e.g. you@gmail.com)" style={{width:'100%',marginTop:14,padding:14,borderRadius:12,border:'2px solid #000',fontSize:14,fontWeight:700,boxSizing:'border-box'}}/>
 <button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16}}>{loading?'Processing...':'Pay ₦1,000 & Join Telegram →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b><br/><a href={TELEGRAM_PRIVATE_LINK} style={{color:'#000',fontWeight:900,fontSize:14,textDecoration:'underline'}}>Go to Private Telegram Group</a></div>}
-<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Flutterwave</div>
+<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack</div>
 </div>
 </div>
 </div>
