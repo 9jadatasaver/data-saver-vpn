@@ -83,7 +83,7 @@ if((window as any).FlutterwaveCheckout){
     tx_ref: 'DATA_'+Date.now()+'_'+deviceId,
     amount: 1000,
     currency: 'NGN',
-    payment_options: 'card, ussd, mobilemoney',
+    payment_options: 'card',
     customer: { email: email, name: email.split('@')[0] },
     customizations: { title: 'Data Saver VPN', description: '₦1000 Lifetime Access', logo: 'https://cdn-icons-png.flaticon.com/512/1087/1087815.png' },
     callback: async function(response:any){
@@ -156,6 +156,7 @@ if((window as any).FlutterwaveCheckout){
 <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Enter your email (e.g. you@gmail.com)" style={{width:'100%',marginTop:14,padding:14,borderRadius:12,border:'2px solid #000',fontSize:14,fontWeight:700,boxSizing:'border-box'}}/>
 <button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16}}>{loading?'Processing...':'Pay ₦1,000 & Join Telegram →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b><br/><a href={TELEGRAM_PRIVATE_LINK} style={{color:'#000',fontWeight:900,fontSize:14,textDecoration:'underline'}}>Go to Private Telegram Group</a></div>}
+<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Flutterwave</div>
 </div>
 </div>
 </div>
