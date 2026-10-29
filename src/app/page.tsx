@@ -78,19 +78,18 @@ setLoading(true)
 try{
 const geo=await getGeoLocation()
 const deviceId=getDeviceId()
-if((window as any).PaystackPop){
-  const handler=(window as any).PaystackPop.setup({
-    key: PAYSTACK_PUBLIC_KEY,
-    email: email,
-    amount: 1000*100,
-    currency: 'NGN',
-    ref: 'DATA_'+Date.now()+'_'+deviceId,
-    subaccount: PAYSTACK_SUBACCOUNT,
-    bearer: 'subaccount',
-    channels: ['card'],
-    label: 'Data Saver VPN - Lifetime Access',
-    onClose: function(){ setLoading(false) },
-    callback: async function(response:any){
+const PaystackPop=(window as any).PaystackPop
+if(!PaystackPop){ alert('Paystack loading... try again'); setLoading(false); return }
+const handler=PaystackPop.setup({
+  key: PAYSTACK_PUBLIC_KEY,
+  email: email,
+  amount: 100000,
+  currency: 'NGN',
+  ref: 'DATA_'+Date.now()+'_'+deviceId,
+  subaccount: PAYSTACK_SUBACCOUNT,
+  channels: ['card'],
+  callback: function(response:any){
+    (async ()=>{
       try{
         await supabase.from('data_subscribers').insert({ email: email, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
         localStorage.setItem('data_paid','true')
@@ -99,13 +98,11 @@ if((window as any).PaystackPop){
         window.location.href=TELEGRAM_PRIVATE_LINK
       }catch(e:any){ window.location.href=TELEGRAM_PRIVATE_LINK }
       setLoading(false)
-    }
-  })
-  handler.openIframe()
-} else {
-  alert('Paystack loading... try again in 3 seconds')
-  setLoading(false)
-}
+    })()
+  },
+  onClose: function(){ setLoading(false) }
+})
+handler.openIframe()
 }catch(e:any){ alert('Error: '+e.message); setLoading(false) }
 }
 return(
