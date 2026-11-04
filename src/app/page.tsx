@@ -107,7 +107,7 @@ try{
     currency: 'NGN',
     ref: 'DATA_'+Date.now()+'_'+deviceId,
     subaccount: PAYSTACK_SUBACCOUNT,
-    channels: ['card'],
+    channels: ['bank_transfer', 'bank', 'ussd', 'card'],
     callback: function(response:any){
       (async ()=>{
         try{
@@ -202,11 +202,11 @@ return(
 </div>
 <div style={{marginTop:24,background:'#fff',borderRadius:20,padding:20,color:'#000'}}>
 <h2 style={{fontWeight:900,fontSize:18}}>Subscribe Now — ₦1,000 Only</h2>
-<p style={{fontSize:12,opacity:.6,marginTop:4}}>Enter email, pay with card, get instant access</p>
+<p style={{fontSize:12,opacity:.6,marginTop:4}}>Enter email, pay with transfer, bank app or card, get instant access</p>
 <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Enter your email (e.g. you@gmail.com)" style={{width:'100%',marginTop:14,padding:14,borderRadius:12,border:'2px solid #000',fontSize:14,fontWeight:700,boxSizing:'border-box'}}/>
 <button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16,cursor:'pointer'}}>{loading?'Processing...':'Pay ₦1,000 & Get Access →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b></div>}
-<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack • Card only</div>
+<div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack • Transfer, Bank App or Card</div>
 </div>
 <p style={{fontSize:11,opacity:.6,marginTop:16,textAlign:'center',lineHeight:1.5}}>Awareness guide only. No guarantee of free data. Results may vary by network.</p>
 </div>
