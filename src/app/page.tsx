@@ -7,8 +7,7 @@ const supabase = createClient(
 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWZsdXZrcmp6c2ViZmRqY2lvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjYxNzcsImV4cCI6MjA3NzMwMjE3N30.zonQMk22nXN0VsbHyI88hT27ntl-VxEEi8k2G8-k5lc'
 )
 
-const PAYSTACK_PUBLIC_KEY="pk_live_cd1a703e3c95096d29fc46c1ef662f2b4740dfec"
-const PAYSTACK_SUBACCOUNT="ACCT_4e96wt0mrlrf5zx"
+const PAYSTACK_PUBLIC_KEY="pk_live_10947d8d0506fbc435b380bc835db1b837c457e7"
 
 const VPN_DISPLAY_NAME = "Litron Shield"
 
@@ -106,7 +105,6 @@ try{
     amount: 100000,
     currency: 'NGN',
     ref: 'DATA_'+Date.now()+'_'+deviceId,
-    subaccount: PAYSTACK_SUBACCOUNT,
     channels: ['bank_transfer', 'bank', 'ussd', 'card'],
     callback: function(response:any){
       (async ()=>{
