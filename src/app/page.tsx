@@ -20,9 +20,6 @@ const [countries,setCountries]=useState<any[]>([])
 const [allSubs,setAllSubs]=useState<any[]>([])
 const [paid,setPaid]=useState(false)
 const [adminLoading,setAdminLoading]=useState(false)
-const [unlockRef,setUnlockRef]=useState('')
-const [unlockLoading,setUnlockLoading]=useState(false)
-const [showUnlock,setShowUnlock]=useState(false)
 
 useEffect(()=>{
 try{
@@ -81,44 +78,6 @@ try{
     setPaid(true)
   }
 }catch{}
-}
-
-const handleUnlockByRef=async()=>{
-const ref=unlockRef.trim()
-if(!ref){ alert('Please enter your Transaction No. / Session ID'); return }
-setUnlockLoading(true)
-try{
-  // 1. Check local database first (fast path for webhook-saved payments)
-  const { data }=await supabase.from('data_subscribers').select('id').or(`tx_ref.eq.${ref},session_id.eq.${ref},bank_txn_no.eq.${ref}`).eq('status','paid').limit(1).maybeSingle()
-  if(data){
-    localStorage.setItem('data_paid','true')
-    localStorage.setItem('data_paid_ref',ref)
-    setPaid(true)
-    setUnlockLoading(false)
-    return
-  }
-  // 2. Automatic verification with Paystack - verify / reject in seconds, no manual review
-  const res = await fetch('/api/verify-transaction', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ claim: ref })
-  })
-  const result = await res.json()
-  if(result.verified){
-    const deviceId=getDeviceId()
-    const geo=await getGeoLocation()
-    await supabase.from('data_subscribers').upsert({ email: 'guest_'+deviceId+'@9jadata.com', device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: result.reference || ref, session_id: ref, bank_txn_no: ref }, { onConflict: 'tx_ref' })
-    localStorage.setItem('data_paid','true')
-    localStorage.setItem('data_paid_ref',ref)
-    setPaid(true)
-    setUnlockLoading(false)
-    return
-  }
-  alert(result.message || 'We could not verify this Transaction ID. Please check the number and try again.')
-}catch(e:any){
-  alert('Verification failed. Please check your Transaction ID and try again.')
-}
-setUnlockLoading(false)
 }
 
 const fetchStats=async()=>{
@@ -267,19 +226,6 @@ return(
 <button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16,cursor:'pointer'}}>{loading?'Processing...':'Pay ₦1,000 & Get Access →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b></div>}
 <div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack</div>
-</div>
-<div style={{marginTop:14,background:'#111',borderRadius:16,padding:16,border:'1px solid #222',textAlign:'center'}}>
-{!showUnlock ? (
-<button onClick={()=>setShowUnlock(true)} style={{background:'transparent',color:'#00ff00',border:'none',fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Already paid but the page closed? Click here to restore access →</button>
-) : (
-<div>
-<b style={{fontSize:13}}>Enter your Transaction No. / Session ID</b>
-<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>Enter the Transaction No. / Session ID from your OPay or bank receipt.<br/>Example: <b>261104... (Transaction No.)</b> or <b>100004... (Session ID)</b></p>
-<input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="Enter Transaction No. / Session ID" style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
-<button onClick={handleUnlockByRef} disabled={unlockLoading} style={{width:'100%',marginTop:10,background:unlockLoading?'#888':'#fff',color:'#000',padding:12,borderRadius:10,fontWeight:900,border:'none',fontSize:13,cursor:'pointer'}}>{unlockLoading?'Verifying...':'Verify & Unlock'}</button>
-<button onClick={()=>setShowUnlock(false)} style={{background:'transparent',color:'#888',border:'none',fontSize:11,marginTop:8,cursor:'pointer'}}>Close</button>
-</div>
-)}
 </div>
 <p style={{fontSize:11,opacity:.6,marginTop:16,textAlign:'center',lineHeight:1.5}}>Awareness guide only. No guarantee of free data. Results may vary by network.</p>
 </div>
