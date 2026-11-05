@@ -20,6 +20,7 @@ const [countries,setCountries]=useState<any[]>([])
 const [allSubs,setAllSubs]=useState<any[]>([])
 const [paid,setPaid]=useState(false)
 const [adminLoading,setAdminLoading]=useState(false)
+const [restoring,setRestoring]=useState(false)
 
 useEffect(()=>{
 try{
@@ -33,6 +34,7 @@ try{
   }
   if(localStorage.getItem('data_paid')==='true') setPaid(true)
   checkAutoUnlock()
+  checkPendingPayment()
   const script=document.createElement('script')
   script.src='https://js.paystack.co/v1/inline.js'
   script.async=true
@@ -80,6 +82,33 @@ try{
 }catch{}
 }
 
+// AUTO RESTORE: If user paid but network failed / pressed back, verify the pending ref saved before Paystack opened
+const checkPendingPayment=async()=>{
+try{
+  if(localStorage.getItem('data_paid')==='true') return
+  const pendingRef = localStorage.getItem('data_pending_ref')
+  if(!pendingRef) return
+  setRestoring(true)
+  const res = await fetch('/api/verify-transaction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reference: pendingRef })
+  })
+  const result = await res.json()
+  if(result.verified){
+    const deviceId=getDeviceId()
+    const geo=await getGeoLocation()
+    const payEmail = result.email || 'guest_'+deviceId+'@9jadata.com'
+    await supabase.from('data_subscribers').upsert({ email: payEmail, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: result.reference || pendingRef }, { onConflict: 'tx_ref' })
+    localStorage.setItem('data_paid','true')
+    localStorage.setItem('data_paid_ref', result.reference || pendingRef)
+    localStorage.removeItem('data_pending_ref')
+    setPaid(true)
+  }
+  setRestoring(false)
+}catch{ setRestoring(false) }
+}
+
 const fetchStats=async()=>{
 setAdminLoading(true)
 try{
@@ -112,12 +141,16 @@ try{
   const payEmail = (email && email.includes('@')) ? email : 'guest_'+deviceId+'@9jadata.com'
   const PaystackPop=(window as any).PaystackPop
   if(!PaystackPop){ alert('Paystack is still loading. Please wait 3 seconds and try again.'); setLoading(false); return }
+  const ref = 'DATA_'+Date.now()+'_'+deviceId
+  // Save BEFORE opening Paystack - so if network fails / user presses back, we can still restore
+  localStorage.setItem('data_pending_ref', ref)
+  localStorage.setItem('data_pending_email', payEmail)
   const handler=PaystackPop.setup({
     key: PAYSTACK_PUBLIC_KEY,
     email: payEmail,
     amount: 100000,
     currency: 'NGN',
-    ref: 'DATA_'+Date.now()+'_'+deviceId,
+    ref: ref,
     channels: ['bank_transfer', 'bank', 'ussd', 'card'],
     callback: function(response:any){
       (async ()=>{
@@ -131,6 +164,7 @@ try{
           }
           localStorage.setItem('data_paid','true')
           localStorage.setItem('data_paid_ref',response.reference)
+          localStorage.removeItem('data_pending_ref')
           setPaid(true)
         }catch(e:any){
           alert('Payment completed but could not be saved: ' + (e?.message || e))
@@ -139,7 +173,12 @@ try{
         setLoading(false)
       })()
     },
-    onClose: function(){ setLoading(false) }
+    onClose: function(){ 
+      // Don't clear pending ref on close - user may have paid and pressed back
+      setLoading(false)
+      // Try to restore immediately after close - covers "Return to Merchant" / back button case
+      setTimeout(()=>checkPendingPayment(), 1000)
+    }
   })
   handler.openIframe()
 }catch(e:any){ alert('Error: '+e.message); setLoading(false) }
@@ -227,6 +266,7 @@ return(
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b></div>}
 <div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack</div>
 </div>
+{restoring&&<div style={{marginTop:14,background:'#111',borderRadius:12,padding:12,textAlign:'center',border:'1px solid #222',fontSize:12}}>Checking your last payment... Please wait</div>}
 <p style={{fontSize:11,opacity:.6,marginTop:16,textAlign:'center',lineHeight:1.5}}>Awareness guide only. No guarantee of free data. Results may vary by network.</p>
 </div>
 </div>
