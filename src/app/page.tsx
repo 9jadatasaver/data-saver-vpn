@@ -20,6 +20,9 @@ const [countries,setCountries]=useState<any[]>([])
 const [allSubs,setAllSubs]=useState<any[]>([])
 const [paid,setPaid]=useState(false)
 const [adminLoading,setAdminLoading]=useState(false)
+const [unlockRef,setUnlockRef]=useState('')
+const [unlockLoading,setUnlockLoading]=useState(false)
+const [showUnlock,setShowUnlock]=useState(false)
 
 useEffect(()=>{
 try{
@@ -32,6 +35,8 @@ try{
     setIsAdmin(true) 
   }
   if(localStorage.getItem('data_paid')==='true') setPaid(true)
+  // Auto-unlock: same phone, page close after payment -> check device_id in Supabase
+  checkAutoUnlock()
   const script=document.createElement('script')
   script.src='https://js.paystack.co/v1/inline.js'
   script.async=true
@@ -65,6 +70,39 @@ try{
   localStorage.setItem('data_device_id', id)
   return id
 }catch{ return 'data_'+Date.now() }
+}
+
+const checkAutoUnlock=async()=>{
+try{
+  if(localStorage.getItem('data_paid')==='true') return
+  const deviceId=getDeviceId()
+  const { data }=await supabase.from('data_subscribers').select('id').eq('device_id',deviceId).eq('status','paid').limit(1).maybeSingle()
+  if(data){
+    localStorage.setItem('data_paid','true')
+    setPaid(true)
+  }
+}catch{}
+}
+
+const handleUnlockByRef=async()=>{
+const ref=unlockRef.trim()
+if(!ref){ alert('Enter your Paystack Reference'); return }
+setUnlockLoading(true)
+try{
+  const { data, error }=await supabase.from('data_subscribers').select('id').eq('tx_ref',ref).eq('status','paid').limit(1).maybeSingle()
+  if(error) throw error
+  if(!data){
+    alert('Reference not found. Check am well — e dey for your Paystack receipt / bank alert. E start with DATA_')
+    setUnlockLoading(false)
+    return
+  }
+  localStorage.setItem('data_paid','true')
+  localStorage.setItem('data_paid_ref',ref)
+  setPaid(true)
+}catch(e:any){
+  alert('Could not verify: '+(e?.message||e))
+}
+setUnlockLoading(false)
 }
 
 const fetchStats=async()=>{
@@ -109,7 +147,7 @@ try{
     callback: function(response:any){
       (async ()=>{
         try{
-          const { error } = await supabase.from('data_subscribers').insert({ email: payEmail, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
+          const { error } = await supabase.from('data_subscribers').upsert({ email: payEmail, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference }, { onConflict: 'tx_ref' })
           if(error){
             alert('Payment done but NOT saved: ' + error.message)
             console.log('insert error', error)
@@ -117,6 +155,7 @@ try{
             return
           }
           localStorage.setItem('data_paid','true')
+          localStorage.setItem('data_paid_ref',response.reference)
           setPaid(true)
         }catch(e:any){
           alert('Payment done but NOT saved: ' + (e?.message || e))
@@ -212,6 +251,19 @@ return(
 <button onClick={handlePay} disabled={loading} style={{width:'100%',marginTop:12,background:loading?'#888':'#00ff00',color:'#000',padding:16,borderRadius:12,fontWeight:900,border:'none',fontSize:16,cursor:'pointer'}}>{loading?'Processing...':'Pay ₦1,000 & Get Access →'}</button>
 {paid&&<div style={{marginTop:12,background:'#dcfce7',padding:12,borderRadius:12,textAlign:'center'}}><b style={{color:'#16a34a',fontSize:13}}>✅ Already Paid!</b></div>}
 <div style={{textAlign:'center',marginTop:12,fontSize:10,opacity:.5}}>Secured by Paystack</div>
+</div>
+<div style={{marginTop:14,background:'#111',borderRadius:16,padding:16,border:'1px solid #222',textAlign:'center'}}>
+{!showUnlock ? (
+<button onClick={()=>setShowUnlock(true)} style={{background:'transparent',color:'#00ff00',border:'none',fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Paid already but page closed? Click here to unlock →</button>
+) : (
+<div>
+<b style={{fontSize:13}}>Enter your Paystack Reference</b>
+<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>E dey for your Paystack receipt / bank alert.<br/>E start with <b>DATA_</b> — no email needed.</p>
+<input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="DATA_..." style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
+<button onClick={handleUnlockByRef} disabled={unlockLoading} style={{width:'100%',marginTop:10,background:unlockLoading?'#888':'#fff',color:'#000',padding:12,borderRadius:10,fontWeight:900,border:'none',fontSize:13,cursor:'pointer'}}>{unlockLoading?'Checking...':'Unlock My Guide'}</button>
+<button onClick={()=>setShowUnlock(false)} style={{background:'transparent',color:'#888',border:'none',fontSize:11,marginTop:8,cursor:'pointer'}}>Close</button>
+</div>
+)}
 </div>
 <p style={{fontSize:11,opacity:.6,marginTop:16,textAlign:'center',lineHeight:1.5}}>Awareness guide only. No guarantee of free data. Results may vary by network.</p>
 </div>
