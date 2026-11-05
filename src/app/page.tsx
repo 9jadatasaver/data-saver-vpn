@@ -109,10 +109,19 @@ try{
     callback: function(response:any){
       (async ()=>{
         try{
-          await supabase.from('data_subscribers').insert({ email: payEmail, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
+          const { error } = await supabase.from('data_subscribers').insert({ email: payEmail, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference })
+          if(error){
+            alert('Payment done but NOT saved: ' + error.message)
+            console.log('insert error', error)
+            setLoading(false)
+            return
+          }
           localStorage.setItem('data_paid','true')
           setPaid(true)
-        }catch(e:any){ setPaid(true) }
+        }catch(e:any){
+          alert('Payment done but NOT saved: ' + (e?.message || e))
+          console.log('insert error', e)
+        }
         setLoading(false)
       })()
     },
