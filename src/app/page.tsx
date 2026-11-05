@@ -35,7 +35,6 @@ try{
     setIsAdmin(true) 
   }
   if(localStorage.getItem('data_paid')==='true') setPaid(true)
-  // Auto-unlock: same phone, page close after payment -> check device_id in Supabase
   checkAutoUnlock()
   const script=document.createElement('script')
   script.src='https://js.paystack.co/v1/inline.js'
@@ -86,19 +85,23 @@ try{
 
 const handleUnlockByRef=async()=>{
 const ref=unlockRef.trim()
-if(!ref){ alert('Enter your Paystack Reference'); return }
+if(!ref){ alert('Enter your Transaction No. / Session ID'); return }
 setUnlockLoading(true)
 try{
-  const { data, error }=await supabase.from('data_subscribers').select('id').eq('tx_ref',ref).eq('status','paid').limit(1).maybeSingle()
+  // Try all 3: DATA_ ref, Session ID, Bank Transaction No.
+  const { data, error }=await supabase.from('data_subscribers').select('id').or(`tx_ref.eq.${ref},session_id.eq.${ref},bank_txn_no.eq.${ref}`).eq('status','paid').limit(1).maybeSingle()
   if(error) throw error
-  if(!data){
-    alert('Reference not found. Check am well — e dey for your Paystack receipt / bank alert. E start with DATA_')
+  if(data){
+    localStorage.setItem('data_paid','true')
+    localStorage.setItem('data_paid_ref',ref)
+    setPaid(true)
     setUnlockLoading(false)
     return
   }
-  localStorage.setItem('data_paid','true')
-  localStorage.setItem('data_paid_ref',ref)
-  setPaid(true)
+  // Not found yet - save as claim for manual verification like big companies do
+  const deviceId=getDeviceId()
+  await supabase.from('unlock_claims').insert({ claim: ref, device_id: deviceId, status: 'pending' })
+  alert('We don receive your Transaction ID. We dey verify am with Paystack. Check back in a few minutes - if e match, your guide go unlock. If you still need help, send this Transaction No. to us.')
 }catch(e:any){
   alert('Could not verify: '+(e?.message||e))
 }
@@ -257,9 +260,9 @@ return(
 <button onClick={()=>setShowUnlock(true)} style={{background:'transparent',color:'#00ff00',border:'none',fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Paid already but page closed? Click here to unlock →</button>
 ) : (
 <div>
-<b style={{fontSize:13}}>Enter your Paystack Reference</b>
-<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>E dey for your Paystack receipt / bank alert.<br/>E start with <b>DATA_</b> — no email needed.</p>
-<input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="DATA_..." style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
+<b style={{fontSize:13}}>Enter your Transaction No. / Session ID</b>
+<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>Copy am from your OPay / bank receipt.<br/>Example: <b>261104... (Transaction No.)</b> or <b>100004... (Session ID)</b><br/>You fit also paste DATA_... if you get am.</p>
+<input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="Paste Transaction No. / Session ID here" style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
 <button onClick={handleUnlockByRef} disabled={unlockLoading} style={{width:'100%',marginTop:10,background:unlockLoading?'#888':'#fff',color:'#000',padding:12,borderRadius:10,fontWeight:900,border:'none',fontSize:13,cursor:'pointer'}}>{unlockLoading?'Checking...':'Unlock My Guide'}</button>
 <button onClick={()=>setShowUnlock(false)} style={{background:'transparent',color:'#888',border:'none',fontSize:11,marginTop:8,cursor:'pointer'}}>Close</button>
 </div>
