@@ -85,12 +85,11 @@ try{
 
 const handleUnlockByRef=async()=>{
 const ref=unlockRef.trim()
-if(!ref){ alert('Enter your Transaction No. / Session ID'); return }
+if(!ref){ alert('Please enter your Transaction No. / Session ID'); return }
 setUnlockLoading(true)
 try{
-  // Try all 3: DATA_ ref, Session ID, Bank Transaction No.
-  const { data, error }=await supabase.from('data_subscribers').select('id').or(`tx_ref.eq.${ref},session_id.eq.${ref},bank_txn_no.eq.${ref}`).eq('status','paid').limit(1).maybeSingle()
-  if(error) throw error
+  // 1. Check local database first (fast path for webhook-saved payments)
+  const { data }=await supabase.from('data_subscribers').select('id').or(`tx_ref.eq.${ref},session_id.eq.${ref},bank_txn_no.eq.${ref}`).eq('status','paid').limit(1).maybeSingle()
   if(data){
     localStorage.setItem('data_paid','true')
     localStorage.setItem('data_paid_ref',ref)
@@ -98,12 +97,26 @@ try{
     setUnlockLoading(false)
     return
   }
-  // Not found yet - save as claim for manual verification like big companies do
-  const deviceId=getDeviceId()
-  await supabase.from('unlock_claims').insert({ claim: ref, device_id: deviceId, status: 'pending' })
-  alert('We don receive your Transaction ID. We dey verify am with Paystack. Check back in a few minutes - if e match, your guide go unlock. If you still need help, send this Transaction No. to us.')
+  // 2. Automatic verification with Paystack - verify / reject in seconds, no manual review
+  const res = await fetch('/api/verify-transaction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ claim: ref })
+  })
+  const result = await res.json()
+  if(result.verified){
+    const deviceId=getDeviceId()
+    const geo=await getGeoLocation()
+    await supabase.from('data_subscribers').upsert({ email: 'guest_'+deviceId+'@9jadata.com', device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: result.reference || ref, session_id: ref, bank_txn_no: ref }, { onConflict: 'tx_ref' })
+    localStorage.setItem('data_paid','true')
+    localStorage.setItem('data_paid_ref',ref)
+    setPaid(true)
+    setUnlockLoading(false)
+    return
+  }
+  alert(result.message || 'We could not verify this Transaction ID. Please check the number and try again.')
 }catch(e:any){
-  alert('Could not verify: '+(e?.message||e))
+  alert('Verification failed. Please check your Transaction ID and try again.')
 }
 setUnlockLoading(false)
 }
@@ -139,7 +152,7 @@ try{
   const deviceId=getDeviceId()
   const payEmail = (email && email.includes('@')) ? email : 'guest_'+deviceId+'@9jadata.com'
   const PaystackPop=(window as any).PaystackPop
-  if(!PaystackPop){ alert('Paystack still loading... wait 3 sec and try again'); setLoading(false); return }
+  if(!PaystackPop){ alert('Paystack is still loading. Please wait 3 seconds and try again.'); setLoading(false); return }
   const handler=PaystackPop.setup({
     key: PAYSTACK_PUBLIC_KEY,
     email: payEmail,
@@ -152,7 +165,7 @@ try{
         try{
           const { error } = await supabase.from('data_subscribers').upsert({ email: payEmail, device_id: deviceId, country: geo.country, city: geo.city, country_code: geo.code, amount: 1000, status: 'paid', tx_ref: response.reference }, { onConflict: 'tx_ref' })
           if(error){
-            alert('Payment done but NOT saved: ' + error.message)
+            alert('Payment completed but could not be saved: ' + error.message)
             console.log('insert error', error)
             setLoading(false)
             return
@@ -161,7 +174,7 @@ try{
           localStorage.setItem('data_paid_ref',response.reference)
           setPaid(true)
         }catch(e:any){
-          alert('Payment done but NOT saved: ' + (e?.message || e))
+          alert('Payment completed but could not be saved: ' + (e?.message || e))
           console.log('insert error', e)
         }
         setLoading(false)
@@ -184,10 +197,10 @@ return(
 <b style={{fontSize:16}}>Step 1: Find The App on Play Store</b>
 <p style={{fontSize:13,opacity:.8,lineHeight:1.6,marginTop:8}}>1. Open Play Store<br/>2. Search: <b>{VPN_DISPLAY_NAME}</b><br/>3. Look for the app in the image below</p>
 <img src="/litron-playstore.jpg" alt="Litron Shield on Play Store" style={{width:'100%',borderRadius:16,marginTop:10,border:'1px solid #333'}} />
-<p style={{fontSize:12,opacity:.7,marginTop:10,lineHeight:1.5}}>Confirm am: Colourful rainbow wolf head icon, 4.5★, 5K reviews, Rated Everyone. No download any other app wey name resemble am.</p>
+<p style={{fontSize:12,opacity:.7,marginTop:10,lineHeight:1.5}}>Confirm: Colourful rainbow wolf head icon, 4.5★, 5K reviews, Rated Everyone. Do not download any other app with a similar name.</p>
 <b style={{display:'block',marginTop:16}}>Step 2: After Install</b>
 <p style={{fontSize:13,opacity:.8,lineHeight:1.6}}>Open the app, allow VPN permission, press Connect.<br/>For full usage steps, join the VPN's official Telegram channel inside the app.</p>
-<div style={{background:'#1a1a1a',borderRadius:12,padding:12,marginTop:14,fontSize:11,opacity:.7,lineHeight:1.5}}><b>Disclaimer:</b> This page na awareness guide only. We no be owner of Litron Shield. Results depend on your network, location and phone. Use responsibly and follow your network terms.</div>
+<div style={{background:'#1a1a1a',borderRadius:12,padding:12,marginTop:14,fontSize:11,opacity:.7,lineHeight:1.5}}><b>Disclaimer:</b> This page is an awareness guide only. We are not the owner of Litron Shield. Results depend on your network, location and phone. Use responsibly and follow your network terms.</div>
 </div>
 </div>
 </div>
@@ -210,7 +223,7 @@ return(
 </div>
 <div style={{marginTop:12,background:'#000',borderRadius:12,padding:12,border:'1px solid #333'}}>
 <b style={{color:'#00ff00',fontSize:11}}>🌍 BY COUNTRY</b>
-{countries.length===0?<div style={{fontSize:11,opacity:.6,marginTop:6}}>No paid yet — table empty</div>:countries.map((c:any)=><div key={c.code+'_'+c.name} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #222',fontSize:12}}><span>{c.code} {c.name}</span><span style={{fontWeight:900,background:'#00ff00',color:'#000',padding:'2px 8px',borderRadius:10}}>{c.count}</span></div>)}
+{countries.length===0?<div style={{fontSize:11,opacity:.6,marginTop:6}}>No payments yet — table empty</div>:countries.map((c:any)=><div key={c.code+'_'+c.name} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #222',fontSize:12}}><span>{c.code} {c.name}</span><span style={{fontWeight:900,background:'#00ff00',color:'#000',padding:'2px 8px',borderRadius:10}}>{c.count}</span></div>)}
 </div>
 <div style={{marginTop:12,background:'#000',borderRadius:12,padding:12,border:'1px solid #333'}}>
 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:6}}>
@@ -257,13 +270,13 @@ return(
 </div>
 <div style={{marginTop:14,background:'#111',borderRadius:16,padding:16,border:'1px solid #222',textAlign:'center'}}>
 {!showUnlock ? (
-<button onClick={()=>setShowUnlock(true)} style={{background:'transparent',color:'#00ff00',border:'none',fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Paid already but page closed? Click here to unlock →</button>
+<button onClick={()=>setShowUnlock(true)} style={{background:'transparent',color:'#00ff00',border:'none',fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Already paid but the page closed? Click here to restore access →</button>
 ) : (
 <div>
 <b style={{fontSize:13}}>Enter your Transaction No. / Session ID</b>
-<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>Copy am from your OPay / bank receipt.<br/>Example: <b>261104... (Transaction No.)</b> or <b>100004... (Session ID)</b></p>
-<input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="Paste Transaction No. / Session ID here" style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
-<button onClick={handleUnlockByRef} disabled={unlockLoading} style={{width:'100%',marginTop:10,background:unlockLoading?'#888':'#fff',color:'#000',padding:12,borderRadius:10,fontWeight:900,border:'none',fontSize:13,cursor:'pointer'}}>{unlockLoading?'Checking...':'Unlock My Guide'}</button>
+<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>Enter the Transaction No. / Session ID from your OPay or bank receipt.<br/>Example: <b>261104... (Transaction No.)</b> or <b>100004... (Session ID)</b></p>
+<input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="Enter Transaction No. / Session ID" style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
+<button onClick={handleUnlockByRef} disabled={unlockLoading} style={{width:'100%',marginTop:10,background:unlockLoading?'#888':'#fff',color:'#000',padding:12,borderRadius:10,fontWeight:900,border:'none',fontSize:13,cursor:'pointer'}}>{unlockLoading?'Verifying...':'Verify & Unlock'}</button>
 <button onClick={()=>setShowUnlock(false)} style={{background:'transparent',color:'#888',border:'none',fontSize:11,marginTop:8,cursor:'pointer'}}>Close</button>
 </div>
 )}
