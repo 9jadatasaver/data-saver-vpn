@@ -261,7 +261,7 @@ return(
 ) : (
 <div>
 <b style={{fontSize:13}}>Enter your Transaction No. / Session ID</b>
-<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>Copy am from your OPay / bank receipt.<br/>Example: <b>261104... (Transaction No.)</b> or <b>100004... (Session ID)</b><br/>You fit also paste DATA_... if you get am.</p>
+<p style={{fontSize:11,opacity:.6,marginTop:6,lineHeight:1.5}}>Copy am from your OPay / bank receipt.<br/>Example: <b>261104... (Transaction No.)</b> or <b>100004... (Session ID)</b></p>
 <input value={unlockRef} onChange={(e)=>setUnlockRef(e.target.value)} placeholder="Paste Transaction No. / Session ID here" style={{width:'100%',marginTop:10,padding:12,borderRadius:10,border:'1px solid #333',background:'#000',color:'#fff',fontSize:13,boxSizing:'border-box'}} />
 <button onClick={handleUnlockByRef} disabled={unlockLoading} style={{width:'100%',marginTop:10,background:unlockLoading?'#888':'#fff',color:'#000',padding:12,borderRadius:10,fontWeight:900,border:'none',fontSize:13,cursor:'pointer'}}>{unlockLoading?'Checking...':'Unlock My Guide'}</button>
 <button onClick={()=>setShowUnlock(false)} style={{background:'transparent',color:'#888',border:'none',fontSize:11,marginTop:8,cursor:'pointer'}}>Close</button>
